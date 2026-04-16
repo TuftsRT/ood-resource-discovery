@@ -89,41 +89,6 @@ Examples:
 @partition_filter = :all
 ```
 
-## Installation
-
-Install the shared ERB partial on the Open OnDemand server:
-
-```bash
-sudo install -D -m 0644 resource_discovery.erb \
-  /etc/ood/config/apps/dashboard/batch_connect/partials/resource_discovery.erb
-```
-
-`form.js` must be available from each app directory because Open OnDemand loads
-JavaScript relative to the app that declares `javascript: "form.js"`.
-
-You can copy it into each app:
-
-```bash
-sudo install -m 0644 form.js /var/www/ood/apps/sys/jupyter/form.js
-sudo install -m 0644 form.js /var/www/ood/apps/sys/rstudio/form.js
-```
-
-Or symlink each app to a shared copy:
-
-```bash
-sudo install -D -m 0644 form.js \
-  /etc/ood/config/apps/dashboard/batch_connect/partials/form.js
-
-sudo ln -sf /etc/ood/config/apps/dashboard/batch_connect/partials/form.js \
-  /var/www/ood/apps/sys/jupyter/form.js
-
-sudo ln -sf /etc/ood/config/apps/dashboard/batch_connect/partials/form.js \
-  /var/www/ood/apps/sys/rstudio/form.js
-```
-
-Use whichever approach fits your site's deployment process. Copying is simpler;
-symlinking keeps one live shared JavaScript implementation.
-
 ## App Usage
 
 In an app's `form.yml.erb`, load the shared partial before `cluster:`.
