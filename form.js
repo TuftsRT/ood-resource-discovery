@@ -536,8 +536,20 @@ function updateHoursForPartition() {
   try { console.log('[hours] update: final max =', maxHours, ', value =', hoursInput.value); } catch (_) {}
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-  try { console.log('[gpu] DOMContentLoaded: initializing GPU options, cores, memory, hours, and availability warnings'); } catch (_) {}
+function initializeResourceDiscoveryForm() {
+  if (window.oodResourceDiscoveryInitialized) {
+    return true;
+  }
+
+  try { console.log('[gpu] initializing GPU options, cores, memory, hours, and availability warnings'); } catch (_) {}
+  var partitionSelect = document.getElementById('batch_connect_session_context_partition');
+  if (!partitionSelect) {
+    try { console.warn('[gpu] initialize: partition select not found yet, will retry'); } catch (_) {}
+    return false;
+  }
+
+  window.oodResourceDiscoveryInitialized = true;
+
   repopulateGpuTypesForPartition();
   updateNumGpusForPartition();
   updateCoresForPartition();
@@ -545,20 +557,17 @@ document.addEventListener('DOMContentLoaded', function () {
   updateHoursForPartition();
   updateGpuAvailabilityWarning();
   
-  var partitionSelect = document.getElementById('batch_connect_session_context_partition');
   var gpuTypeSelect = document.getElementById('batch_connect_session_context_gpu_type');
   
-  if (partitionSelect) {
-    partitionSelect.addEventListener('change', function () {
-      try { console.log('[partition] change ->', partitionSelect.value); } catch (_) {}
-      repopulateGpuTypesForPartition();
-      updateNumGpusForPartition();
-      updateCoresForPartition();
-      updateMemoryForPartition();
-      updateHoursForPartition();
-      updateGpuAvailabilityWarning();
-    });
-  }
+  partitionSelect.addEventListener('change', function () {
+    try { console.log('[partition] change ->', partitionSelect.value); } catch (_) {}
+    repopulateGpuTypesForPartition();
+    updateNumGpusForPartition();
+    updateCoresForPartition();
+    updateMemoryForPartition();
+    updateHoursForPartition();
+    updateGpuAvailabilityWarning();
+  });
   
   if (gpuTypeSelect) {
     gpuTypeSelect.addEventListener('change', function () {
@@ -569,4 +578,30 @@ document.addEventListener('DOMContentLoaded', function () {
       updateGpuAvailabilityWarning();
     });
   }
-});
+
+  return true;
+}
+
+function initializeResourceDiscoveryFormWhenReady() {
+  if (initializeResourceDiscoveryForm()) {
+    return;
+  }
+
+  setTimeout(initializeResourceDiscoveryForm, 250);
+  setTimeout(initializeResourceDiscoveryForm, 1000);
+
+  if (window.MutationObserver) {
+    var observer = new MutationObserver(function () {
+      if (initializeResourceDiscoveryForm()) {
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeResourceDiscoveryFormWhenReady);
+} else {
+  initializeResourceDiscoveryFormWhenReady();
+}
