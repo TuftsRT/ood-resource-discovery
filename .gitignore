@@ -1,0 +1,10 @@
+.DS_Store
+*.log
+*.tmp
+*.swp
+*~
+
+# Local editor and environment files
+.env
+.vscode/
+.idea/
