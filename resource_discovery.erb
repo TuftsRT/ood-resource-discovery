@@ -592,6 +592,15 @@ def generate_partition_field(filter: @partition_filter)
     else true
     end
   end
+  default_partition =
+    case filter
+    when :gpu
+      filtered.include?('gpu') ? 'gpu' : filtered.first
+    when :cpu, :all
+      filtered.include?('batch') ? 'batch' : filtered.first
+    else
+      filtered.first
+    end
 
   field_yaml = <<~YAML
   partition:
@@ -599,6 +608,7 @@ def generate_partition_field(filter: @partition_filter)
     label: "Partition"
     cacheable: false
     javascript: "form.js"
+    value: "#{default_partition}"
     help: "Partitions available to you (dynamically detected via SLURM)."
     options:
   YAML
