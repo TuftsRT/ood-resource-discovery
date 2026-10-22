@@ -71,7 +71,9 @@ Set `@partition_filter` in each app's `form.yml.erb` before loading
 
 Available filters:
 
-- `:cpu`: show only CPU-only partitions.
+- `:cpu`: show CPU-only partitions plus all lab partitions (any partition other
+  than `batch`, `gpu`, `preempt`, or `blackwell`), even if a lab partition has
+  GPU nodes.
 - `:gpu`: show only partitions that contain GPU nodes.
 - `:all`: show all user-accessible partitions.
 
