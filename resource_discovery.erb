@@ -356,7 +356,8 @@ if @detected_types.empty?
   # No GPUs detected anywhere: keep a CPU-only sentinel.
   @options << ['none', 'none']
 else
-  # GPUs detected: require users to select a concrete GPU type/feature.
+  # GPUs detected: offer 'Any' first, then each concrete GPU type/feature.
+  @options << ['Any', 'any']
   remaining = @detected_types.to_a
   remaining.sort_by! { |t| gpu_display_label(t) }
   remaining.each do |t|
@@ -374,6 +375,7 @@ build_opts = lambda do |types_set|
   if types_set.empty?
     local << ['none', 'none']
   else
+    local << ['Any', 'any']
     remaining_local = types_set.to_a
     remaining_local.sort_by! { |t| gpu_display_label(t) }
     remaining_local.each do |t|
