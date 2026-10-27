@@ -75,7 +75,10 @@ Available filters:
   than `batch`, `gpu`, `preempt`, or `blackwell`), even if a lab partition has
   GPU nodes.
 - `:gpu`: show only partitions that contain GPU nodes.
-- `:all`: show all user-accessible partitions.
+- `:all`: show all user-accessible partitions. Lab partitions that contain GPU
+  nodes also offer a `None (CPU only)` GPU type (value `none`), listed first so
+  it is the default, letting lab members run CPU-only jobs there. CPU and memory
+  maxima for that choice cover every node in the partition, GPU nodes included.
 
 Examples:
 

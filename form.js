@@ -238,10 +238,20 @@ function updateNumGpusForPartition() {
 
   var selectedPartition = partitionSelect.value;
   var selectedGpuType = gpuTypeSelect ? gpuTypeSelect.value : 'none';
+  var numGpusFormGroup = numGpusInput.closest('.mb-3') || numGpusInput.closest('.form-group');
 
   if (!selectedGpuType || selectedGpuType === 'none') {
+    // CPU-only selection (e.g. "None (CPU only)" on a lab GPU partition):
+    // hide the GPU count and submit no value.
+    if (numGpusFormGroup) {
+      numGpusFormGroup.style.display = 'none';
+    }
     numGpusInput.value = '';
     return;
+  }
+
+  if (numGpusFormGroup) {
+    numGpusFormGroup.style.display = '';
   }
 
   var datasetValue = (numGpusInput.dataset && numGpusInput.dataset.partitionGpuMaxGpus) ? numGpusInput.dataset.partitionGpuMaxGpus : null;

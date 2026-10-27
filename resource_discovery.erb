@@ -62,6 +62,10 @@ end
 # it contains GPU nodes.
 @public_partitions ||= %w[batch gpu preempt blackwell]
 
+def lab_partition?(partition)
+  !@public_partitions.include?(partition)
+end
+
 @nodes_out = cached_capture('nodes', 'scontrol show node --oneliner')
 
 # Capture partition time limits
@@ -374,12 +378,18 @@ end
 # Build partition-aware options map using the same labeling/ordering rules
 @partition_options_map = {}
 
-build_opts = lambda do |types_set|
+build_opts = lambda do |types_set, partition|
   local = []
 
   if types_set.empty?
     local << ['none', 'none']
   else
+    # Under :all, lab partitions that contain GPU nodes also offer a CPU-only
+    # choice (listed first, so it is the default) so lab members can run CPU
+    # jobs there without requesting a GPU.
+    if @partition_filter == :all && lab_partition?(partition)
+      local << ['None (CPU only)', 'none']
+    end
     local << ['Any', 'any']
     remaining_local = types_set.to_a
     remaining_local.sort_by! { |t| gpu_display_label(t) }
@@ -393,7 +403,7 @@ end
 
 @all_partitions = @user_partitions
 @all_partitions.each do |p|
-  @partition_options_map[p] = build_opts.call(@detected_by_partition[p])
+  @partition_options_map[p] = build_opts.call(@detected_by_partition[p], p)
 end
 
 # Also keep a cluster-wide default
@@ -453,6 +463,16 @@ end
   gpu_hash.each { |gpu, val| gpu_hash[gpu] = cap if val > cap }
 end
 
+# CPU-only jobs in a lab partition with GPU nodes can land on any node in it,
+# GPU nodes included, so their 'none' caps are the max across all node types.
+[@max_cores_by_partition_and_gpu, @max_memory_by_partition_and_gpu].each do |map|
+  map.each do |partition, gpu_hash|
+    next unless lab_partition?(partition) && !@detected_by_partition[partition].empty?
+    next if gpu_hash.empty?
+    gpu_hash['none'] = gpu_hash.values.max
+  end
+end
+
 # Compute "any" GPU values for each partition (max across all GPU types)
 # Also compute global fallback values for 'all' partition
 @max_cores_by_partition_and_gpu.each do |partition, gpu_hash|
@@ -492,10 +512,6 @@ all_hours = @max_hours_by_partition.values
 @max_gpus_by_partition_and_gpu['all']['any'] = @global_max_gpus
 @max_gpus_by_partition_and_gpu['all']['none'] = 0
 @max_hours_by_partition['all'] = @global_max_hours
-
-def lab_partition?(partition)
-  !@public_partitions.include?(partition)
-end
 
 # Select partitions matching the filter (:all, :gpu, :cpu).
 # :cpu keeps CPU-only partitions plus all lab partitions (GPU or not).
