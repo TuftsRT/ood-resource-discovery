@@ -57,18 +57,37 @@ end
 # four generate_* helpers so app authors only set it in one place.
 @partition_filter ||= :all
 
+# Shared partition/QOS rules (partition_qos.rb, deployed next to this partial).
+# If it is missing, the built-in public partition list below is used and the
+# "Request priority start" checkbox is left alone by form.js.
+@partition_qos_path ||= '/etc/ood/config/apps/dashboard/batch_connect/partials/partition_qos.rb'
+begin
+  load @partition_qos_path
+rescue LoadError, StandardError => _e
+  # Fall back to built-in defaults.
+end
+
 # Public (shared) partitions. Any user-accessible partition not listed here is
 # treated as a lab partition and is always shown under the :cpu filter, even if
 # it contains GPU nodes.
-@public_partitions ||= %w[batch gpu preempt blackwell]
+@public_partitions ||= defined?(PartitionQos) ? PartitionQos.public_partitions : %w[batch gpu preempt blackwell]
 
 def lab_partition?(partition)
   !@public_partitions.include?(partition)
 end
 
 # Partitions shown under every filter (:all, :cpu, :gpu), whether or not they
-# contain GPU nodes, as long as the user has access to them.
+# contain GPU nodes. All users have access to these.
 @always_shown_partitions ||= %w[preempt]
+
+# Public partitions that accept both CPU and GPU jobs. Like lab partitions, they
+# offer "None (CPU only)" in the GPU type list under :all.
+@mixed_use_partitions ||= %w[preempt]
+
+# Partitions with GPU nodes that should also offer a CPU-only choice.
+def cpu_choice_partition?(partition)
+  lab_partition?(partition) || @mixed_use_partitions.include?(partition)
+end
 
 @nodes_out = cached_capture('nodes', 'scontrol show node --oneliner')
 
@@ -388,10 +407,10 @@ build_opts = lambda do |types_set, partition|
   if types_set.empty?
     local << ['none', 'none']
   else
-    # Under :all, lab partitions that contain GPU nodes also offer a CPU-only
-    # choice (listed first, so it is the default) so lab members can run CPU
-    # jobs there without requesting a GPU.
-    if @partition_filter == :all && lab_partition?(partition)
+    # Under :all, lab partitions (and mixed-use partitions such as preempt)
+    # that contain GPU nodes also offer a CPU-only choice, listed first so it
+    # is the default, so users can run CPU jobs there without requesting a GPU.
+    if @partition_filter == :all && cpu_choice_partition?(partition)
       local << ['None (CPU only)', 'none']
     end
     local << ['Any', 'any']
@@ -467,11 +486,12 @@ end
   gpu_hash.each { |gpu, val| gpu_hash[gpu] = cap if val > cap }
 end
 
-# CPU-only jobs in a lab partition with GPU nodes can land on any node in it,
-# GPU nodes included, so their 'none' caps are the max across all node types.
+# CPU-only jobs in a lab or mixed-use partition with GPU nodes can land on any
+# node in it, GPU nodes included, so their 'none' caps are the max across all
+# node types.
 [@max_cores_by_partition_and_gpu, @max_memory_by_partition_and_gpu].each do |map|
   map.each do |partition, gpu_hash|
-    next unless lab_partition?(partition) && !@detected_by_partition[partition].empty?
+    next unless cpu_choice_partition?(partition) && !@detected_by_partition[partition].empty?
     next if gpu_hash.empty?
     gpu_hash['none'] = gpu_hash.values.max
   end
@@ -679,8 +699,19 @@ def generate_partition_field(filter: @partition_filter)
     javascript: "form.js"
     value: "#{default_partition}"
     help: "Partitions available to you (dynamically detected via SLURM)."
-    options:
   YAML
+
+  # Tell form.js which partitions allow "Request priority start"
+  # (--qos=interactive). Only emitted when partition_qos.rb is loaded.
+  if defined?(PartitionQos)
+    allowed = filtered.select { |p| PartitionQos.interactive_allowed?(p, @public_partitions) }
+    allowed_json = allowed.to_json.gsub("'", "''")
+    field_yaml += "  html_options:\n"
+    field_yaml += "    data:\n"
+    field_yaml += "      interactive_qos_partitions: '#{allowed_json}'\n"
+  end
+
+  field_yaml += "  options:\n"
 
   filtered.each do |p|
     field_yaml += "    - [\"#{p}\", \"#{p}\"]\n"

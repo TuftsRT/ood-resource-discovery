@@ -5,6 +5,7 @@ Connect apps:
 
 - `resource_discovery.erb`
 - `form.js`
+- `partition_qos.rb`
 
 Together, they generate dynamic Slurm resource widgets for interactive apps and
 keep dependent form fields synchronized as users change partitions or GPU
@@ -75,13 +76,15 @@ Available filters:
   than `batch`, `gpu`, `preempt`, or `blackwell`), even if a lab partition has
   GPU nodes.
 - `:gpu`: show only partitions that contain GPU nodes.
-- `:all`: show all user-accessible partitions. Lab partitions that contain GPU
-  nodes also offer a `None (CPU only)` GPU type (value `none`), listed first so
-  it is the default, letting lab members run CPU-only jobs there. CPU and memory
-  maxima for that choice cover every node in the partition, GPU nodes included.
+- `:all`: show all user-accessible partitions. Lab partitions and `preempt`
+  that contain GPU nodes also offer a `None (CPU only)` GPU type (value `none`),
+  listed first so it is the default, letting users run CPU-only jobs there. CPU
+  and memory maxima for that choice cover every node in the partition, GPU
+  nodes included.
 
-The `preempt` partition is shown under every filter, with or without GPU nodes,
-for users who have access to it (configurable via `@always_shown_partitions`).
+The `preempt` partition is available to all users and is shown under every
+filter, with or without GPU nodes (configurable via `@always_shown_partitions`).
+It accepts both CPU and GPU jobs (`@mixed_use_partitions`).
 
 Examples:
 
@@ -203,6 +206,40 @@ h200-141G + 4 GPUs -> --gres=gpu:h200:4 --constraint=h200-141G
 
 The app's `submit.yml.erb` should treat blank or `none` GPU type as a CPU job,
 and a concrete GPU type as a GPU job.
+
+## Partition QOS Rules
+
+`partition_qos.rb` holds the shared partition lists and Slurm QOS rules. Deploy
+it next to `resource_discovery.erb`:
+
+```text
+/etc/ood/config/apps/dashboard/batch_connect/partials/partition_qos.rb
+```
+
+| Partition | QOS submitted | "Request priority start" (`ta_qos`) |
+|---|---|---|
+| `preempt` | `--qos=preempt` | hidden |
+| lab partitions | `--qos=normal-contrib` | hidden |
+| `blackwell` | none | hidden |
+| `batch`, `gpu` | `--qos=interactive` when checked, otherwise none | shown |
+
+`resource_discovery.erb` loads it to decide which partitions are lab partitions
+and adds `data-interactive-qos-partitions` to the partition select; `form.js`
+uses that to hide and uncheck the priority-start checkbox where it does not
+apply. If the file is missing, the checkbox is left alone.
+
+Each app's `submit.yml.erb` should use it to choose `--qos`:
+
+```erb
+    - "--partition=<%= partition %>"
+<%-
+  load '/etc/ood/config/apps/dashboard/batch_connect/partials/partition_qos.rb'
+  qos = PartitionQos.qos_for(partition, (ta_qos if defined?(ta_qos)))
+-%>
+<%- if qos -%>
+    - "--qos=<%= qos %>"
+<%- end -%>
+```
 
 ## Requirements
 
