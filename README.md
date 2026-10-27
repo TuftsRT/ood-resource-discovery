@@ -80,6 +80,9 @@ Available filters:
   it is the default, letting lab members run CPU-only jobs there. CPU and memory
   maxima for that choice cover every node in the partition, GPU nodes included.
 
+The `preempt` partition is shown under every filter, with or without GPU nodes,
+for users who have access to it (configurable via `@always_shown_partitions`).
+
 Examples:
 
 ```erb

@@ -66,6 +66,10 @@ def lab_partition?(partition)
   !@public_partitions.include?(partition)
 end
 
+# Partitions shown under every filter (:all, :cpu, :gpu), whether or not they
+# contain GPU nodes, as long as the user has access to them.
+@always_shown_partitions ||= %w[preempt]
+
 @nodes_out = cached_capture('nodes', 'scontrol show node --oneliner')
 
 # Capture partition time limits
@@ -515,8 +519,10 @@ all_hours = @max_hours_by_partition.values
 
 # Select partitions matching the filter (:all, :gpu, :cpu).
 # :cpu keeps CPU-only partitions plus all lab partitions (GPU or not).
+# @always_shown_partitions (e.g. preempt) are kept under every filter.
 def partitions_for_filter(filter)
   @user_partitions.select do |p|
+    next true if @always_shown_partitions.include?(p)
     has_gpu = !@detected_by_partition[p].empty?
     case filter
     when :gpu then has_gpu
